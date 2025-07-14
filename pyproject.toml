@@ -1,0 +1,17 @@
+[project]
+name = "manga-organizer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "file-picker",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.3",
+]
+
+[tool.uv.sources]
+file-picker = { git = "https://github.com/sato1214syun/file-picker.git", rev = "v0.2.3" }
