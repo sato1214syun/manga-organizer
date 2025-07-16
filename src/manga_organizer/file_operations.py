@@ -87,24 +87,17 @@ def move_zip_file(zip_file: Path, series_title_dict: dict[str, Path]) -> bool:
         # ダイアログを表示
         root = tk.Tk()
         root.withdraw()  # メインウィンドウを非表示
+        root.lift()  # ウィンドウを前面に持ってくる
+        root.attributes("-topmost", True)  # noqa: FBT003
+        root.focus_force()  # フォーカスを強制的に設定
 
         message = f"'{book_title}' は以下のシリーズタイトルに含まれています:\n\n"
-        for i, key in enumerate(matching_keys, 1):
-            message += f"{i}. {key}\n"
+        message += f"{matching_keys[0]}\n"
         message += f"\n'{zip_file.name}' をこのフォルダに移動しますか?"
 
         # 複数の候補がある場合は選択ダイアログを表示
-        if len(matching_keys) == 1:
-            result = messagebox.askyesno("移動確認", message)
-            selected_key = matching_keys[0] if result else None
-        else:
-            # 複数候補の場合は最初の候補を使用
-            # より良い実装のためには選択ダイアログが必要
-            result = messagebox.askyesno(
-                "移動確認", message + "\n最初の候補を使用します。"
-            )
-            selected_key = matching_keys[0] if result else None
-
+        result = messagebox.askyesno("移動確認", message)
+        selected_key = matching_keys[0] if result else None
         root.destroy()
 
         if selected_key:
@@ -116,7 +109,9 @@ def move_zip_file(zip_file: Path, series_title_dict: dict[str, Path]) -> bool:
             zip_file.rename(new_zip_path)
 
             # zip内のフォルダ名も変更
-            if not rename_folder_in_zip(new_zip_path, selected_key + book_suffix):
+            if not rename_folder_in_zip(
+                new_zip_path, f"{selected_key} {book_suffix}"
+            ):
                 print(f"Warning: Failed to rename folder inside {new_filename}")
 
             # 移動先パスを取得

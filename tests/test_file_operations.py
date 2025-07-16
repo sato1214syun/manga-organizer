@@ -3,11 +3,10 @@
 import shutil
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-
-from manga_organizer.file_operations import move_zip_file
+from src.manga_organizer.file_operations import move_zip_file
 
 
 @pytest.fixture
@@ -53,7 +52,9 @@ def test_zip_file(temp_test_dir: Path) -> Path:
 class TestMoveZipFile:
     """Test cases for move_zip_file function."""
 
-    def test_exact_match_success(self, test_zip_file: Path, mock_series_dict):
+    def test_exact_match_success(
+        self, test_zip_file: Path, mock_series_dict: dict[str, Path]
+    ) -> None:
         """Test exact match case - should move without dialog."""
         # Rename the zip file to match exactly
         exact_match_zip = test_zip_file.parent / "てすとフォルダ2第1巻.zip"
@@ -66,7 +67,9 @@ class TestMoveZipFile:
         expected_path = mock_series_dict["てすとフォルダ2"] / "てすとフォルダ2第1巻.zip"
         assert expected_path.exists()
 
-    def test_exact_match_file_exists(self, test_zip_file, mock_series_dict):
+    def test_exact_match_file_exists(
+        self, test_zip_file: Path, mock_series_dict: dict[str, Path]
+    ) -> None:
         """Test exact match case where destination file already exists."""
         # Rename the zip file to match exactly
         exact_match_zip = test_zip_file.parent / "てすとフォルダ2第1巻.zip"
@@ -82,10 +85,14 @@ class TestMoveZipFile:
         # Original file should still exist
         assert exact_match_zip.exists()
 
-    @patch("manga_organizer.file_operations.messagebox.askyesno")
-    @patch("manga_organizer.file_operations.tk.Tk")
+    @patch("src.manga_organizer.file_operations.messagebox.askyesno")
+    @patch("src.manga_organizer.file_operations.tk.Tk")
     def test_partial_match_user_accepts(
-        self, mock_tk, mock_messagebox, test_zip_file, mock_series_dict
+        self,
+        mock_tk: MagicMock,
+        mock_messagebox: MagicMock,
+        test_zip_file: Path,
+        mock_series_dict: dict[str, Path],
     ) -> None:
         """Test partial match case where user accepts the move."""
         mock_messagebox.return_value = True  # User clicks "Yes"
@@ -104,11 +111,15 @@ class TestMoveZipFile:
         expected_path = mock_series_dict["てすとフォルダ1"] / "てすとフォルダ1第1巻.zip"
         assert expected_path.exists()
 
-    @patch("manga_organizer.file_operations.messagebox.askyesno")
-    @patch("manga_organizer.file_operations.tk.Tk")
+    @patch("src.manga_organizer.file_operations.messagebox.askyesno")
+    @patch("src.manga_organizer.file_operations.tk.Tk")
     def test_partial_match_user_declines(
-        self, mock_tk, mock_messagebox, test_zip_file, mock_series_dict
-    ):
+        self,
+        mock_tk: MagicMock,
+        mock_messagebox: MagicMock,
+        test_zip_file: Path,
+        mock_series_dict: dict[str, Path],
+    ) -> None:
         """Test partial match case where user declines the move."""
         mock_messagebox.return_value = False  # User clicks "No"
         mock_root = mock_tk.return_value
@@ -124,14 +135,17 @@ class TestMoveZipFile:
         # Original file should still exist
         assert test_zip_file.exists()
 
-    @patch("manga_organizer.file_operations.messagebox.askyesno")
-    @patch("manga_organizer.file_operations.tk.Tk")
+    @patch("src.manga_organizer.file_operations.messagebox.askyesno")
+    @patch("src.manga_organizer.file_operations.tk.Tk")
     def test_partial_match_destination_exists(
-        self, mock_tk, mock_messagebox, test_zip_file, mock_series_dict
-    ):
+        self,
+        mock_tk: MagicMock,
+        mock_messagebox: MagicMock,
+        test_zip_file: Path,
+        mock_series_dict: dict[str, Path],
+    ) -> None:
         """Test partial match case where destination file already exists."""
         mock_messagebox.return_value = True  # User clicks "Yes"
-        mock_root = mock_tk.return_value
 
         # Create a file that already exists at destination for the first matching key
         dest_file = mock_series_dict["てすとフォルダ1"] / "てすとフォルダ1第1巻.zip"
@@ -143,7 +157,9 @@ class TestMoveZipFile:
         # Original file should be restored to original name
         assert test_zip_file.exists()
 
-    def test_no_match(self, temp_test_dir, mock_series_dict):
+    def test_no_match(
+        self, temp_test_dir: Path, mock_series_dict: dict[str, Path]
+    ) -> None:
         """Test case where there's no match at all."""
         # Create a zip file with no matching title
         no_match_zip = temp_test_dir / "完全に違う名前.zip"
@@ -156,7 +172,9 @@ class TestMoveZipFile:
         # Original file should still exist
         assert no_match_zip.exists()
 
-    def test_multiple_partial_matches(self, temp_test_dir, mock_series_dict):
+    def test_multiple_partial_matches(
+        self, temp_test_dir: Path, mock_series_dict: dict[str, Path]
+    ) -> None:
         """Test case with multiple partial matches."""
         # Add another series that would also match
         folder3 = mock_series_dict["てすとフォルダ1"].parent / "あ) [作者] てすと作品"
@@ -169,12 +187,11 @@ class TestMoveZipFile:
 
         with (
             patch(
-                "manga_organizer.file_operations.messagebox.askyesno"
+                "src.manga_organizer.file_operations.messagebox.askyesno"
             ) as mock_messagebox,
-            patch("manga_organizer.file_operations.tk.Tk") as mock_tk,
+            patch("src.manga_organizer.file_operations.tk.Tk"),
         ):
             mock_messagebox.return_value = True
-            mock_root = mock_tk.return_value
 
             result = move_zip_file(test_zip, mock_series_dict)
 
