@@ -1,28 +1,12 @@
-"""Main script for organizing manga zip files."""
+"""Main module for manga organizer."""
 
 import re
-import shutil
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from file_picker import pick_dir
-
-
-def move_zip_file(zip_file: Path, series_title_dict: dict[str, Path]) -> bool:
-    """Move zip files to their respective directories based on series title."""
-    file_name = zip_file.stem  # File name without extension
-    book_title = re.sub(r"第\d+巻.*$", "", file_name).strip()
-    dist_path = series_title_dict.get(book_title)
-    if dist_path:
-        dst = dist_path / zip_file.name
-        if dst.exists():
-            print(f"File {dst.name} already exists. Skipping.")
-            return False
-        shutil.move(str(zip_file), str(dst))
-        print(f"Moved {zip_file.name} into {dist_path.name}")
-        return True
-    return False
+from src.manga_organizer.file_operations import move_zip_file
 
 
 def main() -> None:

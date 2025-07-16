@@ -1,2 +1,2 @@
-destination_directory = "./test/dest"
-source_directory = "./test/test_files"
+destination_directory = "./tests/test_data/dest"
+source_directory = "./tests/test_data/test_files"
