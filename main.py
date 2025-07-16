@@ -3,9 +3,26 @@
 import re
 import shutil
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from file_picker import pick_dir
+
+
+def move_zip_file(zip_file: Path, series_title_dict: dict[str, Path]) -> bool:
+    """Move zip files to their respective directories based on series title."""
+    file_name = zip_file.stem  # File name without extension
+    book_title = re.sub(r"第\d+巻.*$", "", file_name).strip()
+    dist_path = series_title_dict.get(book_title)
+    if dist_path:
+        dst = dist_path / zip_file.name
+        if dst.exists():
+            print(f"File {dst.name} already exists. Skipping.")
+            return False
+        shutil.move(str(zip_file), str(dst))
+        print(f"Moved {zip_file.name} into {dist_path.name}")
+        return True
+    return False
 
 
 def main() -> None:
@@ -63,20 +80,17 @@ def main() -> None:
     }
 
     # 6. Move zip files according to the rules
+    # 並列実行する
     moved_count = 0
-    for zip_file in zip_files:
-        file_name = zip_file.stem  # File name without extension
-        book_title = re.sub(r"\d+巻$", "", file_name).strip()
-        dist_path = series_title_dict.get(book_title)
-        if dist_path:
-            dst = dist_path / zip_file.name
-            if dst.exists():
-                print(f"File {dst.name} already exists. Skipping.")
-                continue
-            shutil.move(str(zip_file), str(dst))
-            moved_count += 1
-            print(f"Moved {zip_file.name} into {dist_path.name}")
-
+    with ThreadPoolExecutor() as executor:
+        futures = {
+            executor.submit(move_zip_file, zip_file, series_title_dict): zip_file
+            for zip_file in zip_files
+        }
+        for future in futures:
+            is_moved = future.result()
+            if is_moved:
+                moved_count += 1
     print(f"\nFinished. Moved {moved_count} files.")
 
 

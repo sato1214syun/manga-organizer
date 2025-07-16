@@ -1,2 +1,2 @@
-destination_directory = "D:/myscript/manga-organizer/test/dest"
-source_directory = "D:/myscript/manga-organizer/test/test_files"
+destination_directory = "./test/dest"
+source_directory = "./test/test_files"
