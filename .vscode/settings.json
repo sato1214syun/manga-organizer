@@ -4,4 +4,11 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
+    "cSpell.words": [
+        "padx",
+        "pady",
+        "pyinstaller",
+        "rapidfuzz",
+        "pytest"
+    ],
 }

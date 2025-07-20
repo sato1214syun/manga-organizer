@@ -11,7 +11,11 @@ from pathlib import Path
 
 from file_picker import pick_dir
 
-from src.manga_organizer.file_operations import move_zip_file
+from src.manga_organizer.file_operations import (
+    clear_processing_results,
+    move_zip_file,
+    show_processing_results,
+)
 
 
 def run() -> None:
@@ -55,8 +59,17 @@ def run() -> None:
         return
     source_dir = Path(source_path)
 
+    # 処理結果をクリア
+    clear_processing_results()
+
     # 2. Get all zip file paths in the selected folder
-    zip_files = source_dir.glob("*.zip")
+    zip_files = list(source_dir.glob("*.zip"))
+
+    if not zip_files:
+        print("No zip files found in the selected directory.")
+        return
+
+    print(f"Found {len(zip_files)} zip file(s) to process.")
 
     # 4. Recursively get the paths of subdirectories in the destination directory
     # 5. extract titles of the paths and mapping to subdirectory paths {title: path}
@@ -80,4 +93,8 @@ def run() -> None:
             is_moved = future.result()
             if is_moved:
                 moved_count += 1
+
     print(f"\nFinished. Moved {moved_count} files.")
+
+    # 処理結果をダイアログで表示
+    show_processing_results()
