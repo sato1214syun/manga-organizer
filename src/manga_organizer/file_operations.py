@@ -1,11 +1,17 @@
 """File operations for manga organizer."""
 
+# インポート順序を修正
 import re
 import shutil
 import tkinter as tk
 import zipfile
 from pathlib import Path
 from tkinter import messagebox
+
+from rapidfuzz import process  # rapidfuzzをインポート
+
+# 定数を定義
+SCORE_THRESHOLD = 80
 
 
 def rename_folder_in_zip(zip_path: Path, new_name: str) -> bool:
@@ -80,10 +86,9 @@ def move_zip_file(zip_file: Path, series_title_dict: dict[str, Path]) -> bool:
         print(f"Moved {zip_file.name} into {dist_path.name}")
         return True
 
-    # 部分配列チェック(book_titleが各キーに含まれるかチェック).
-    matching_keys = [key for key in series_title_dict if book_title in key]
-
-    if matching_keys:
+    # 曖昧検索で一番スコアの高いキーを取得
+    best_match, score = process.extractOne(book_title, series_title_dict.keys())
+    if score >= SCORE_THRESHOLD:  # 定数を使用
         # ダイアログを表示
         root = tk.Tk()
         root.withdraw()  # メインウィンドウを非表示
@@ -91,31 +96,27 @@ def move_zip_file(zip_file: Path, series_title_dict: dict[str, Path]) -> bool:
         root.attributes("-topmost", True)  # noqa: FBT003
         root.focus_force()  # フォーカスを強制的に設定
 
-        message = f"'{book_title}' は以下のシリーズタイトルに含まれています:\n\n"
-        message += f"{matching_keys[0]}\n"
+        message = f"'{book_title}' は以下のシリーズタイトルに最も近いです:\n\n"
+        message += f"{best_match} (スコア: {score})\n"
         message += f"\n'{zip_file.name}' をこのフォルダに移動しますか?"
 
-        # 複数の候補がある場合は選択ダイアログを表示
         result = messagebox.askyesno("移動確認", message)
-        selected_key = matching_keys[0] if result else None
         root.destroy()
 
-        if selected_key:
+        if result:
             # ファイル名を変更
-            new_filename = selected_key + book_suffix + ".zip"
+            new_filename = best_match + book_suffix + ".zip"
             new_zip_path = zip_file.parent / new_filename
 
             # zipファイルをリネーム
             zip_file.rename(new_zip_path)
 
             # zip内のフォルダ名も変更
-            if not rename_folder_in_zip(
-                new_zip_path, f"{selected_key} {book_suffix}"
-            ):
+            if not rename_folder_in_zip(new_zip_path, f"{best_match} {book_suffix}"):
                 print(f"Warning: Failed to rename folder inside {new_filename}")
 
             # 移動先パスを取得
-            dist_path = series_title_dict[selected_key]
+            dist_path = series_title_dict[best_match]
             dst = dist_path / new_filename
 
             if dst.exists():
