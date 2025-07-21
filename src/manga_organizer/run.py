@@ -13,43 +13,70 @@ from file_picker import pick_dir
 
 from src.manga_organizer.file_operations import (
     clear_processing_results,
-    move_zip_file,
+    get_fuzzy_matches,
+    move_zip_file_with_confirmation,
+    show_batch_confirmation_dialog,
     show_processing_results,
 )
 
 
-def run() -> None:
-    """Execute main script.
+def load_config() -> tuple[Path | None, str]:
+    """Load configuration from config.toml file.
 
-    zipファイルを、特定のルールに従ってフォルダ分けする機能。
-
-    1. フォルダをfile-pickerを用いて選択
-    2. そのフォルダ内のzipファイルのパスをすべて取得する
-    3. zipファイルの仕分け先ディレクトリは設定ファイル(config.toml)で指定しておく
-    4. 仕分け先ディレクトリ内のサブディレクトリのパスを再帰的に取得する
-    5. サブディレクトリ名から、"あ) [作者名]"を除き、trimした名前(作品名)を取得し、
-        4.で取得したサブディレクトリのパスとdict型で関連付けておく
-    4. 仕分け先ディレクトリ内でのzipファイルのフォルダ分けルールは以下とする
-        - zipファイル名から"01巻"を除外して作品名を抽出する。
-        - 同じ作品名のサブディレクトリに移動する
-        - サブディレクトリにすでに同名のzipファイルが存在する場合はスキップする
+    Returns
+    -------
+        tuple: (dest_dir, source_dir_str) or (None, "") if error
     """
-    # 3. Specify the destination directory in the config file (config.toml)
     config_path = Path("config.toml")
     try:
         with config_path.open("rb") as f:
             config = tomllib.load(f)
-        dest_dir_str = Path(config.get("destination_directory"))
-        source_dir_str = Path(config.get("source_directory"))
-        if not dest_dir_str.exists():
+        dest_dir_str = config.get("destination_directory")
+        source_dir_str = config.get("source_directory", "")
+        if not dest_dir_str:
             print("'destination_directory' not found in config.toml")
-            return
+            return None, ""
         dest_dir = Path(dest_dir_str)
+        if not dest_dir.exists():
+            print(f"Destination directory does not exist: {dest_dir}")
+            return None, ""
+        return dest_dir, str(source_dir_str)
     except FileNotFoundError:
         print("config.toml not found.")
-        return
-    except Exception as e:  # noqa: BLE001
+        return None, ""
+    except tomllib.TOMLDecodeError as e:
         print(f"Error reading config.toml: {e}")
+        return None, ""
+
+
+def build_series_dict(dest_dir: Path) -> dict[str, Path]:
+    """Build dictionary mapping series titles to their directory paths.
+
+    Args:
+        dest_dir: Destination directory to scan for series subdirectories
+
+    Returns
+    -------
+        Dictionary mapping series titles to directory paths
+    """
+    title_regex = re.compile(r"^.*\)\s\[.*?\]\s*")
+    series_title_dict = {}
+
+    for root, dirs, _ in dest_dir.walk():
+        for dir_name in dirs:
+            dir_path = root / dir_name
+            title = title_regex.sub("", dir_name).strip()
+            if title:
+                series_title_dict[title] = dir_path
+
+    return series_title_dict
+
+
+def run() -> None:
+    """Organize manga zip files."""
+    # 3. Specify the destination directory in the config file (config.toml)
+    dest_dir, source_dir_str = load_config()
+    if not dest_dir:
         return
 
     # 1. Select a folder using file-picker
@@ -73,20 +100,26 @@ def run() -> None:
 
     # 4. Recursively get the paths of subdirectories in the destination directory
     # 5. extract titles of the paths and mapping to subdirectory paths {title: path}
-    # Remove "あ) [作者名]" from the subdirectory name and trim spaces to get the title
-    title_regex = r"^.*\)\s\[.*\]"
-    series_title_dict = {
-        re.sub(title_regex, "", d.name).strip(): d
-        for d in dest_dir.rglob("*")
-        if d.is_dir()
-    }
+    series_title_dict = build_series_dict(dest_dir)
 
     # 6. Move zip files according to the rules
+    # 事前に曖昧マッチの確認をメインスレッドで実行
+    print("事前確認を実行中...")
+    all_matches = get_fuzzy_matches(zip_files, series_title_dict)
+    fuzzy_matches = {k: v for k, v in all_matches.items() if v is not None}
+    confirmations = show_batch_confirmation_dialog(fuzzy_matches)
+
+    print("ファイル移動を並列実行中...")
     # 並列実行する
     moved_count = 0
     with ThreadPoolExecutor() as executor:
         futures = {
-            executor.submit(move_zip_file, zip_file, series_title_dict): zip_file
+            executor.submit(
+                move_zip_file_with_confirmation,
+                zip_file,
+                series_title_dict,
+                confirmation=confirmations.get(zip_file),
+            ): zip_file
             for zip_file in zip_files
         }
         for future in futures:
